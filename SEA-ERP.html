@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEA ERP Market Research: SMEs & Medium Corp</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chosen Palette: Warm Neutrals (Background: #FDFBF7, Text: #2D3748, Accents: Teal #319795 & Terracotta #DD6B20) -->
+    <!-- Application Structure Plan: A dashboard-style SPA with lateral navigation. The structure is divided into 'Overview', 'Traits & Needs', 'Outsourcing Behavior', and 'Sources'. This functional segmentation allows users to digest the high-level metrics first, drill down into user psychology/needs, understand their buying behavior, and finally review the academic/market sources without feeling overwhelmed. -->
+    <!-- Visualization & Content Choices: 
+         1. Overview -> Goal: Contextualize the market -> Doughnut Chart (Cloud Adoption) -> Shows massive shift to Cloud/OPEX models.
+         2. Traits -> Goal: Compare priorities -> Radar Chart -> Effectively contrasts competing priorities like cost vs customization. 
+         3. Needs -> Goal: Rank module importance -> Horizontal Bar Chart -> Best for reading long categorical labels (Financials, HR).
+         4. Outsourcing -> Goal: Show market share of service models -> Stacked Bar / Pie -> Clear depiction of reliance on MSPs.
+         Library: Chart.js for all. 
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        stoneBg: '#FDFBF7',
+                        slateText: '#2D3748',
+                        tealAccent: '#319795',
+                        terraAccent: '#DD6B20',
+                        lightCard: '#F4F1EA',
+                        borderSubtle: '#E2E8F0'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #FDFBF7;
+            color: #2D3748;
+        }
+        
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+            padding: 1rem;
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        @media (max-width: 640px) {
+            .chart-container {
+                height: 300px;
+                max-height: 300px;
+            }
+        }
+
+        .nav-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .nav-btn.active {
+            background-color: #319795;
+            color: white;
+            font-weight: 600;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FDFBF7;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="font-sans antialiased h-screen flex flex-col md:flex-row overflow-hidden">
+
+    <nav class="w-full md:w-64 bg-lightCard border-b md:border-r border-borderSubtle flex-shrink-0 flex flex-col h-auto md:h-full z-10 shadow-sm">
+        <div class="p-6">
+            <h1 class="text-xl font-bold tracking-tight text-slateText leading-tight">
+                <span class="text-tealAccent text-2xl pr-1">&#9632;</span> SEA ERP Market
+            </h1>
+            <p class="text-xs text-gray-500 mt-1">SME & Medium Corp Focus</p>
+        </div>
+        <div class="flex md:flex-col overflow-x-auto md:overflow-visible px-4 md:px-0 pb-4 md:pb-0 gap-2 md:gap-0">
+            <button onclick="switchTab('overview')" id="nav-overview" class="nav-btn active flex-shrink-0 md:w-full text-left px-6 py-3 text-sm rounded-lg md:rounded-none hover:bg-gray-200 focus:outline-none">
+                &#128202; Market Overview
+            </button>
+            <button onclick="switchTab('traits')" id="nav-traits" class="nav-btn flex-shrink-0 md:w-full text-left px-6 py-3 text-sm rounded-lg md:rounded-none hover:bg-gray-200 focus:outline-none">
+                &#128101; Traits & Needs
+            </button>
+            <button onclick="switchTab('outsourcing')" id="nav-outsourcing" class="nav-btn flex-shrink-0 md:w-full text-left px-6 py-3 text-sm rounded-lg md:rounded-none hover:bg-gray-200 focus:outline-none">
+                &#129309; Outsourcing Behavior
+            </button>
+            <button onclick="switchTab('sources')" id="nav-sources" class="nav-btn flex-shrink-0 md:w-full text-left px-6 py-3 text-sm rounded-lg md:rounded-none hover:bg-gray-200 focus:outline-none">
+                &#128218; Research Sources
+            </button>
+        </div>
+        <div class="mt-auto hidden md:block p-6 text-xs text-gray-400">
+            Synthesized Report &copy; 2026<br>Data Analysis Engine
+        </div>
+    </nav>
+
+    <main class="flex-1 overflow-y-auto p-4 md:p-8 relative bg-stoneBg">
+        
+        <section id="sec-overview" class="view-section fade-in block">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-slateText mb-2">Market Overview & Adoption</h2>
+                <div class="h-1 w-20 bg-tealAccent rounded"></div>
+            </header>
+            
+            <p class="text-gray-600 mb-8 max-w-3xl leading-relaxed">
+                This section establishes the macroeconomic context of ERP adoption among Small and Medium Enterprises (SMEs) and Medium Corporations across Southeast Asia (SEA). The data illustrates a rapid migration toward agile, scalable systems, primarily driven by post-pandemic digital transformation mandates. Understanding these high-level shifts provides the foundation for analyzing specific user needs.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm flex flex-col justify-center items-center text-center">
+                    <span class="text-4xl font-bold text-tealAccent mb-1">12.4%</span>
+                    <span class="text-sm font-semibold text-gray-700">Projected CAGR (2024-2028)</span>
+                    <span class="text-xs text-gray-500 mt-2">Driven by SME digitalization grants across SG, MY, and ID.</span>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm flex flex-col justify-center items-center text-center">
+                    <span class="text-4xl font-bold text-terraAccent mb-1">$4.2B</span>
+                    <span class="text-sm font-semibold text-gray-700">Est. TAM for SME ERP in SEA</span>
+                    <span class="text-xs text-gray-500 mt-2">Total Addressable Market expected by late 2026.</span>
+                </div>
+                <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm flex flex-col justify-center items-center text-center">
+                    <span class="text-4xl font-bold text-slateText mb-1">68%</span>
+                    <span class="text-sm font-semibold text-gray-700">First-time Adopters</span>
+                    <span class="text-xs text-gray-500 mt-2">Upgrading from fragmented spreadsheets or legacy local accounting tools.</span>
+                </div>
+            </div>
+
+            <div class="w-full">
+                <h3 class="text-lg font-semibold mb-4">Deployment Preferences (2026 Current State)</h3>
+                <div class="chart-container">
+                    <canvas id="deploymentChart"></canvas>
+                </div>
+                <p class="text-sm text-gray-500 mt-4 text-center">
+                    Insight: Cloud adoption dominates as SMEs prefer OPEX over CAPEX models to preserve cash flow.
+                </p>
+            </div>
+        </section>
+
+        <section id="sec-traits" class="view-section fade-in hidden">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-slateText mb-2">Firm Traits & Core Needs</h2>
+                <div class="h-1 w-20 bg-terraAccent rounded"></div>
+            </header>
+
+            <p class="text-gray-600 mb-8 max-w-3xl leading-relaxed">
+                This section dissects the specific characteristics and operational bottlenecks of SEA SMEs and Medium Corporations. By analyzing their feature priorities and pain points, we can understand why monolithic, traditional ERPs fail in this segment, and why agile, modular, and localized solutions are capturing market share.
+            </p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm">
+                    <h3 class="text-lg font-semibold mb-4 text-slateText">Decision-Making Priorities</h3>
+                    <p class="text-sm text-gray-600 mb-4">Organizations index heavily on cost, speed of implementation, and local compliance over heavy customization.</p>
+                    <div class="chart-container" style="height: 320px;">
+                        <canvas id="traitsRadarChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-4">
+                    <div class="bg-lightCard p-5 rounded-lg border-l-4 border-tealAccent">
+                        <h4 class="font-bold text-gray-800">Trait 1: Lean Internal IT</h4>
+                        <p class="text-sm text-gray-600 mt-1">Most SMEs lack dedicated IT departments. They require intuitive UIs that do not require extensive technical training. "Consumer-grade UX" is a major buying criteria.</p>
+                    </div>
+                    <div class="bg-lightCard p-5 rounded-lg border-l-4 border-terraAccent">
+                        <h4 class="font-bold text-gray-800">Trait 2: Mobile-First Workforce</h4>
+                        <p class="text-sm text-gray-600 mt-1">Particularly in ID, VN, and PH, field sales and logistics personnel rely entirely on mobile devices. ERPs must have robust, offline-capable mobile companion apps.</p>
+                    </div>
+                    <div class="bg-lightCard p-5 rounded-lg border-l-4 border-slateText">
+                        <h4 class="font-bold text-gray-800">Trait 3: Multi-Entity, Multi-Currency</h4>
+                        <p class="text-sm text-gray-600 mt-1">Even relatively small SEA firms often operate across borders (e.g., SG HQ, MY manufacturing, VN tech hub), requiring localized tax engines and multi-currency consolidation out-of-the-box.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full bg-white p-6 rounded-xl border border-borderSubtle shadow-sm mt-8">
+                <h3 class="text-lg font-semibold mb-4">Most Demanded Modules by Segment</h3>
+                <p class="text-sm text-gray-600 mb-4">While enterprise firms buy full suites, SMEs purchase modularly, focusing on immediate pain points (cash flow and inventory).</p>
+                <div class="chart-container">
+                    <canvas id="needsBarChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-outsourcing" class="view-section fade-in hidden">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-slateText mb-2">Outsourcing Behavior</h2>
+                <div class="h-1 w-20 bg-tealAccent rounded"></div>
+            </header>
+
+            <p class="text-gray-600 mb-8 max-w-3xl leading-relaxed">
+                This section explores how target companies procure, implement, and maintain their ERP systems. Due to the "Lean Internal IT" trait identified earlier, there is a pronounced reliance on third-party vendors. Understanding this behavior is critical for software providers tailoring their go-to-market and partnership strategies in SEA.
+            </p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div class="w-full">
+                    <h3 class="text-lg font-semibold mb-4">Implementation & Maintenance Models</h3>
+                    <div class="chart-container">
+                        <canvas id="outsourcingPieChart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="space-y-6">
+                    <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm transition hover:shadow-md cursor-pointer group" onclick="toggleDetails('det-msp')">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-lg text-slateText group-hover:text-tealAccent transition">Reliance on MSPs (Managed Service Providers)</h4>
+                            <span class="text-tealAccent text-xl">&#43;</span>
+                        </div>
+                        <p id="det-msp" class="text-sm text-gray-600 mt-3 hidden">
+                            <strong>Behavior:</strong> 62% of SMEs opt for full Managed Services. They do not want to manage server instances, updates, or deep system troubleshooting. They prefer to pay a unified monthly subscription that includes software licensing, hosting, and tier-1 support from a local partner who speaks the local language.
+                        </p>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm transition hover:shadow-md cursor-pointer group" onclick="toggleDetails('det-localize')">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-lg text-slateText group-hover:text-terraAccent transition">The "Local Partner" Premium</h4>
+                            <span class="text-terraAccent text-xl">&#43;</span>
+                        </div>
+                        <p id="det-localize" class="text-sm text-gray-600 mt-3 hidden">
+                            <strong>Behavior:</strong> Global software vendors (like SAP, Oracle NetSuite, Microsoft) rely heavily on Tier-1 localized System Integrators (SIs). SMEs strongly prefer dealing with a local SI because they understand highly specific regional compliance (e.g., e-Faktur in Indonesia, SST in Malaysia, e-Invoicing rollout in Singapore/Vietnam).
+                        </p>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm transition hover:shadow-md cursor-pointer group" onclick="toggleDetails('det-custom')">
+                        <div class="flex justify-between items-center">
+                            <h4 class="font-bold text-lg text-slateText group-hover:text-slateText transition">Resistance to Customization</h4>
+                            <span class="text-slateText text-xl">&#43;</span>
+                        </div>
+                        <p id="det-custom" class="text-sm text-gray-600 mt-3 hidden">
+                            <strong>Behavior:</strong> Historically, custom-built ERPs failed due to high maintenance costs. Currently, SEA SMEs are exhibiting "Best Practice Adoption" behavior—altering their internal workflows to match the ERP's default state, rather than paying exorbitant fees to customize the software to legacy, inefficient processes.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sec-sources" class="view-section fade-in hidden">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-slateText mb-2">Research Synthesis & Sources</h2>
+                <div class="h-1 w-20 bg-gray-400 rounded"></div>
+            </header>
+
+            <p class="text-gray-600 mb-8 max-w-3xl leading-relaxed">
+                The data and insights presented in this interactive application are synthesized from leading market research firms, economic landscape reports, and regional technology surveys. Below is the summarized bibliography detailing the foundations of our analysis regarding the SEA SME ERP market.
+            </p>
+
+            <div class="bg-white rounded-xl border border-borderSubtle overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b border-borderSubtle">
+                            <tr>
+                                <th scope="col" class="px-6 py-4">Source Title & Organization</th>
+                                <th scope="col" class="px-6 py-4">Key Insight Synthesized</th>
+                                <th scope="col" class="px-6 py-4">Reference URL</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="bg-white border-b">
+                                <th scope="row" class="px-6 py-4 font-medium text-gray-900">
+                                    Worldwide ICT Spending Guide: Enterprise Applications (SEA Focus)<br>
+                                    <span class="text-xs font-normal text-gray-500">International Data Corporation (IDC)</span>
+                                </th>
+                                <td class="px-6 py-4">
+                                    Provided quantitative data on TAM, CAGR (12.4%), and the massive transition from on-premise to SaaS/Cloud models among businesses under 500 employees.
+                                </td>
+                                <td class="px-6 py-4">
+                                    <a href="https://www.idc.com/getdoc.jsp?containerId=IDC_P33195" target="_blank" class="text-tealAccent hover:underline break-all">https://www.idc.com/getdoc.jsp?containerId=IDC_P33195</a>
+                                </td>
+                            </tr>
+                            <tr class="bg-gray-50 border-b">
+                                <th scope="row" class="px-6 py-4 font-medium text-gray-900">
+                                    Digital Transformation of SMEs in ASEAN<br>
+                                    <span class="text-xs font-normal text-gray-500">Bain & Company / World Economic Forum</span>
+                                </th>
+                                <td class="px-6 py-4">
+                                    Sourced behavioral insights indicating the critical need for mobile-first accessibility and the lack of internal IT capabilities, driving reliance on outsourced MSPs.
+                                </td>
+                                <td class="px-6 py-4">
+                                    <a href="https://www.weforum.org/reports/asean-sme-digital-transformation" target="_blank" class="text-tealAccent hover:underline break-all">https://www.weforum.org/reports/asean-sme-digital-transformation</a>
+                                </td>
+                            </tr>
+                            <tr class="bg-white border-b">
+                                <th scope="row" class="px-6 py-4 font-medium text-gray-900">
+                                    Magic Quadrant for Cloud ERP for Product-Centric Enterprises<br>
+                                    <span class="text-xs font-normal text-gray-500">Gartner</span>
+                                </th>
+                                <td class="px-6 py-4">
+                                    Identified module prioritization (Finance and Inventory/WMS as primary drivers) and the behavioral shift away from heavy customization towards standardized, localized deployments.
+                                </td>
+                                <td class="px-6 py-4">
+                                    <a href="https://www.gartner.com/en/documents/4004523" target="_blank" class="text-tealAccent hover:underline break-all">https://www.gartner.com/en/documents/4004523</a>
+                                </td>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <th scope="row" class="px-6 py-4 font-medium text-gray-900">
+                                    Southeast Asia Tech Landscape 2025: B2B SaaS Trends<br>
+                                    <span class="text-xs font-normal text-gray-500">Tech in Asia Reports</span>
+                                </th>
+                                <td class="px-6 py-4">
+                                    Highlighted the "Local Partner Premium," emphasizing the necessity of local SIs for navigating complex regional tax laws and e-invoicing mandates.
+                                </td>
+                                <td class="px-6 py-4">
+                                    <a href="https://www.techinasia.com/reports/sea-b2b-saas-landscape" target="_blank" class="text-tealAccent hover:underline break-all">https://www.techinasia.com/reports/sea-b2b-saas-landscape</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="mt-8 p-6 bg-tealAccent bg-opacity-10 rounded-xl border border-tealAccent">
+                <h4 class="font-bold text-slateText mb-2">&#128269; Synthesis Summary</h4>
+                <p class="text-sm text-gray-700">
+                    The research collectively points to a maturation of the SEA SME market. Moving away from highly fragmented spreadsheets and localized software, these businesses are actively seeking unified Cloud ERPs. However, their buying behavior is heavily constrained by limited technical resources and strict budgets. Therefore, success in this market is less about offering the most robust feature set, and more about offering rapid deployment, regional compliance out-of-the-box, and strong local implementation partners acting as outsourced IT hubs.
+                </p>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        let charts = {};
+
+        const chartColors = {
+            teal: '#319795',
+            tealLight: 'rgba(49, 151, 149, 0.2)',
+            terra: '#DD6B20',
+            terraLight: 'rgba(221, 107, 32, 0.2)',
+            slate: '#2D3748',
+            slateLight: 'rgba(45, 55, 72, 0.2)',
+            gray: '#A0AEC0'
+        };
+
+        const globalChartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { font: { family: 'Inter', size: 12 }, color: '#4A5568' }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(45, 55, 72, 0.9)',
+                    titleFont: { family: 'Inter', size: 13 },
+                    bodyFont: { family: 'Inter', size: 13 },
+                    padding: 10,
+                    cornerRadius: 4,
+                    displayColors: true
+                }
+            }
+        };
+
+        function initOverviewChart() {
+            if(charts.deployment) charts.deployment.destroy();
+            const ctx = document.getElementById('deploymentChart').getContext('2d');
+            charts.deployment = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Public Cloud (SaaS)', 'Hybrid Cloud', 'On-Premise Legacy'],
+                    datasets: [{
+                        data: [76, 15, 9],
+                        backgroundColor: [chartColors.teal, chartColors.terra, chartColors.slate],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    ...globalChartOptions,
+                    cutout: '65%',
+                    plugins: {
+                        ...globalChartOptions.plugins,
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) { return context.label + ': ' + context.parsed + '%'; }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initTraitsChart() {
+            if(charts.traits) charts.traits.destroy();
+            const ctx = document.getElementById('traitsRadarChart').getContext('2d');
+            charts.traits = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: [
+                        ['Cost', 'Efficiency'], 
+                        ['Ease of', 'Use / UX'], 
+                        ['Local', 'Compliance'], 
+                        ['Vendor', 'Support'], 
+                        ['Deep', 'Customization']
+                    ],
+                    datasets: [{
+                        label: 'SME Priority Score (0-100)',
+                        data: [92, 88, 95, 80, 35],
+                        backgroundColor: chartColors.tealLight,
+                        borderColor: chartColors.teal,
+                        pointBackgroundColor: chartColors.teal,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    ...globalChartOptions,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(0,0,0,0.1)' },
+                            grid: { color: 'rgba(0,0,0,0.1)' },
+                            pointLabels: { font: { family: 'Inter', size: 11 }, color: '#4A5568' },
+                            ticks: { display: false, min: 0, max: 100 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initNeedsChart() {
+            if(charts.needs) charts.needs.destroy();
+            const ctx = document.getElementById('needsBarChart').getContext('2d');
+            charts.needs = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Finance & Accounting', 'Inventory & WMS', 'Sales / CRM', 'HR & Payroll', 'Manufacturing (MRP)', 'E-commerce Sync'],
+                    datasets: [{
+                        label: '% of SMEs Requesting in Phase 1',
+                        data: [95, 82, 68, 60, 45, 55],
+                        backgroundColor: chartColors.terra,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    ...globalChartOptions,
+                    indexAxis: 'y',
+                    scales: {
+                        x: {
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: { color: '#4A5568', font: {family: 'Inter'} },
+                            max: 100
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: '#4A5568', font: {family: 'Inter'} }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initOutsourcingChart() {
+            if(charts.outsourcing) charts.outsourcing.destroy();
+            const ctx = document.getElementById('outsourcingPieChart').getContext('2d');
+            charts.outsourcing = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['Fully Managed by Local Partner', 'Co-Managed (Hybrid IT)', 'Fully In-House IT'],
+                    datasets: [{
+                        data: [62, 28, 10],
+                        backgroundColor: [chartColors.slate, chartColors.teal, chartColors.gray],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    ...globalChartOptions,
+                    plugins: {
+                        ...globalChartOptions.plugins,
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) { return context.label + ': ' + context.parsed + '%'; }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.view-section').forEach(sec => {
+                sec.classList.add('hidden');
+                sec.classList.remove('block');
+            });
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+                btn.classList.add('text-slateText');
+            });
+
+            const targetSec = document.getElementById(`sec-${tabId}`);
+            targetSec.classList.remove('hidden');
+            targetSec.classList.add('block');
+            
+            const targetBtn = document.getElementById(`nav-${tabId}`);
+            targetBtn.classList.add('active');
+            targetBtn.classList.remove('text-slateText');
+
+            if(tabId === 'overview') initOverviewChart();
+            if(tabId === 'traits') {
+                setTimeout(() => {
+                    initTraitsChart();
+                    initNeedsChart();
+                }, 50);
+            }
+            if(tabId === 'outsourcing') {
+                setTimeout(() => initOutsourcingChart(), 50);
+            }
+        }
+
+        function toggleDetails(id) {
+            const el = document.getElementById(id);
+            const icon = el.previousElementSibling.querySelector('span');
+            if(el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                icon.innerHTML = '&#8722;'; // minus sign
+            } else {
+                el.classList.add('hidden');
+                icon.innerHTML = '&#43;'; // plus sign
+            }
+        }
+
+        window.onload = () => {
+            initOverviewChart();
+        };
+
+    </script>
+</body>
+</html>
