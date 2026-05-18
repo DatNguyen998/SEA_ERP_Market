@@ -1,556 +1,538 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SEA ERP Market Research: SMEs & Medium Corp</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Chosen Palette: Warm Neutrals (Background: #FDFBF7, Text: #2D3748, Accents: Teal #319795 & Terracotta #DD6B20) -->
-    <!-- Application Structure Plan: A dashboard-style SPA with lateral navigation. The structure is divided into 'Overview', 'Traits & Needs', 'Outsourcing Behavior', and 'Sources'. This functional segmentation allows users to digest the high-level metrics first, drill down into user psychology/needs, understand their buying behavior, and finally review the academic/market sources without feeling overwhelmed. -->
-    <!-- Visualization & Content Choices: 
-         1. Overview -> Goal: Contextualize the market -> Doughnut Chart (Cloud Adoption) -> Shows massive shift to Cloud/OPEX models.
-         2. Traits -> Goal: Compare priorities -> Radar Chart -> Effectively contrasts competing priorities like cost vs customization. 
-         3. Needs -> Goal: Rank module importance -> Horizontal Bar Chart -> Best for reading long categorical labels (Financials, HR).
-         4. Outsourcing -> Goal: Show market share of service models -> Stacked Bar / Pie -> Clear depiction of reliance on MSPs.
-         Library: Chart.js for all. 
-    -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  PieChart, Pie, Cell, 
+  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
+} from 'recharts';
+import { 
+  Search, Volume2, Sparkles, X, Loader2, BarChart2, Users, Briefcase, BookOpen, Menu 
+} from 'lucide-react';
 
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        stoneBg: '#FDFBF7',
-                        slateText: '#2D3748',
-                        tealAccent: '#319795',
-                        terraAccent: '#DD6B20',
-                        lightCard: '#F4F1EA',
-                        borderSubtle: '#E2E8F0'
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        body {
-            background-color: #FDFBF7;
-            color: #2D3748;
-        }
-        
-        .chart-container {
-            position: relative;
-            width: 100%;
-            max-width: 700px;
-            margin-left: auto;
-            margin-right: auto;
-            height: 350px;
-            max-height: 400px;
-            padding: 1rem;
-            background-color: #ffffff;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-        }
+const apiKey = ""; // Canvas will automatically inject the key
 
-        @media (max-width: 640px) {
-            .chart-container {
-                height: 300px;
-                max-height: 300px;
-            }
-        }
+const callGeminiAPI = async (prompt, systemPrompt = "You are a professional market research analyst.") => {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+  const payload = {
+    contents: [{ parts: [{ text: prompt }] }],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    tools: [{ google_search: {} }]
+  };
 
-        .nav-btn {
-            transition: all 0.2s ease-in-out;
-        }
-        
-        .nav-btn.active {
-            background-color: #319795;
-            color: white;
-            font-weight: 600;
-        }
+  for (let i = 0; i < 5; i++) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.[0]?.text || "No insights found.";
+    } catch (e) {
+      if (i === 4) throw e;
+      await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+    }
+  }
+};
 
-        .fade-in {
-            animation: fadeIn 0.4s ease-in-out;
-        }
+const pcmToWav = (base64Pcm, sampleRate) => {
+  const pcm = Uint8Array.from(atob(base64Pcm), c => c.charCodeAt(0)).buffer;
+  const wavHeader = new ArrayBuffer(44);
+  const view = new DataView(wavHeader);
+  const pcmSize = pcm.byteLength;
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #FDFBF7;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-    </style>
-</head>
-<body class="font-sans antialiased h-screen flex flex-col md:flex-row overflow-hidden">
+  view.setUint32(0, 0x52494646, false); // RIFF
+  view.setUint32(4, 36 + pcmSize, true);
+  view.setUint32(8, 0x57415645, false); // WAVE
+  view.setUint32(12, 0x666d7420, false); // fmt
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // Mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  view.setUint32(36, 0x64617461, false); // data
+  view.setUint32(40, pcmSize, true);
 
-    <nav class="w-full md:w-64 bg-lightCard border-b md:border-r border-borderSubtle flex-shrink-0 flex flex-col h-auto md:h-full z-10 shadow-sm">
-        <div class="p-6">
-            <h1 class="text-xl font-bold tracking-tight text-slateText leading-tight">
-                <span class="text-tealAccent text-2xl pr-1">&#9632;</span> SEA ERP Market
-            </h1>
-            <p class="text-xs text-gray-500 mt-1">SME & Medium Corp Focus</p>
+  const combined = new Uint8Array(44 + pcmSize);
+  combined.set(new Uint8Array(wavHeader), 0);
+  combined.set(new Uint8Array(pcm), 44);
+  return URL.createObjectURL(new Blob([combined], { type: 'audio/wav' }));
+};
+
+const callGeminiTTS = async (text) => {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+  const payload = {
+    contents: [{ parts: [{ text: `Say professionally: ${text}` }] }],
+    generationConfig: {
+      responseModalities: ["AUDIO"],
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } } }
+    }
+  };
+  
+  for (let i = 0; i < 5; i++) {
+      try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const pcmData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        const mimeType = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.mimeType;
+        const sampleRate = parseInt(mimeType.split('rate=')[1]) || 24000;
+        return pcmToWav(pcmData, sampleRate);
+      } catch (e) {
+          if (i === 4) throw e;
+          await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+      }
+  }
+};
+
+const COLORS = { teal: '#319795', terra: '#DD6B20', slate: '#2D3748', gray: '#A0AEC0' };
+
+const overviewData = [
+  { name: 'SaaS', value: 76, color: COLORS.teal },
+  { name: 'Hybrid', value: 15, color: COLORS.terra },
+  { name: 'On-Prem', value: 9, color: COLORS.slate },
+];
+
+const traitsData = [
+  { subject: 'Cost', A: 92, fullMark: 100 },
+  { subject: 'UX', A: 88, fullMark: 100 },
+  { subject: 'Compliance', A: 95, fullMark: 100 },
+  { subject: 'Support', A: 80, fullMark: 100 },
+  { subject: 'Customization', A: 35, fullMark: 100 },
+];
+
+const needsData = [
+  { name: 'Finance', demand: 95 },
+  { name: 'Inventory', demand: 82 },
+  { name: 'Sales', demand: 68 },
+  { name: 'HR', demand: 60 },
+  { name: 'E-commerce', demand: 55 },
+  { name: 'Mfg', demand: 45 },
+];
+
+const outsourcingData = [
+  { name: 'Managed', value: 62, color: COLORS.slate },
+  { name: 'Hybrid', value: 28, color: COLORS.teal },
+  { name: 'In-House', value: 10, color: COLORS.gray },
+];
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [aiContent, setAiContent] = useState('');
+  const [isAILoading, setIsAILoading] = useState(false);
+  const [lastAIResponse, setLastAIResponse] = useState('');
+  const [intelQuery, setIntelQuery] = useState('');
+  const [intelResult, setIntelResult] = useState('');
+  const [isIntelLoading, setIsIntelLoading] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  const audioRef = useRef(null);
+  const sectionRefs = {
+    overview: useRef(null),
+    traits: useRef(null),
+    outsourcing: useRef(null),
+    sources: useRef(null)
+  };
+
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  };
+
+  const handleAnalyze = async (tabKey) => {
+    setAiModalOpen(true);
+    setIsAILoading(true);
+    setAiContent('');
+    stopAudio();
+
+    try {
+      const sectionText = sectionRefs[tabKey].current?.innerText || "Market context.";
+      const prompt = `Analyze this section of our ERP Market Research: "${sectionText.substring(0, 800)}". Provide 3 high-level strategic takeaways for a software vendor looking to enter the SEA market in 2026. Keep it punchy and professional.`;
+      const response = await callGeminiAPI(prompt);
+      setAiContent(response);
+      setLastAIResponse(response);
+    } catch (e) {
+      setAiContent("Strategic advisor is temporarily offline. Please try again.");
+    } finally {
+      setIsAILoading(false);
+    }
+  };
+
+  const handleSpeakSection = async (tabKey) => {
+    stopAudio();
+    const text = sectionRefs[tabKey].current?.innerText.substring(0, 600) || "";
+    try {
+      const audioUrl = await callGeminiTTS(`Summary: ${text}`);
+      audioRef.current = new Audio(audioUrl);
+      audioRef.current.play();
+    } catch (e) { console.error("TTS failed", e); }
+  };
+
+  const handleReplayAI = async () => {
+    if (!lastAIResponse) return;
+    stopAudio();
+    try {
+      const audioUrl = await callGeminiTTS(lastAIResponse);
+      audioRef.current = new Audio(audioUrl);
+      audioRef.current.play();
+    } catch (e) { console.error("TTS failed", e); }
+  };
+
+  const handleLiveIntel = async () => {
+    if (!intelQuery) return;
+    setIsIntelLoading(true);
+    setIntelResult('');
+    try {
+      const prompt = `Using Google Search, find the latest news or regulatory changes regarding ERP, Digitalization, or E-invoicing in Southeast Asia for the year 2026 related to: ${intelQuery}. Summarize in 3 bullet points.`;
+      const res = await callGeminiAPI(prompt);
+      setIntelResult(res);
+    } catch (e) {
+      setIntelResult("Error fetching live intelligence.");
+    } finally {
+      setIsIntelLoading(false);
+    }
+  };
+
+  const TabButton = ({ id, icon: Icon, label }) => (
+    <button
+      onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }}
+      className={`w-full flex items-center gap-3 px-6 py-4 text-sm transition-all duration-200 ${
+        activeTab === id 
+          ? 'bg-teal-600 text-white font-semibold shadow-md' 
+          : 'text-slate-600 hover:bg-slate-100'
+      }`}
+    >
+      <Icon size={18} />
+      {label}
+    </button>
+  );
+
+  const SectionHeader = ({ title, colorClass, onAnalyze, onListen }) => (
+    <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h2 className="text-3xl font-bold text-slate-800 mb-2">{title}</h2>
+        <div className={`h-1 w-20 ${colorClass} rounded`}></div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={onListen} className="text-xs bg-white border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 flex items-center gap-2 text-slate-700 shadow-sm transition">
+          <Volume2 size={14} className="text-teal-600" />
+          <span className="font-semibold">Listen</span>
+        </button>
+        <button onClick={onAnalyze} className="text-xs bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 flex items-center gap-2 shadow-sm transition">
+          <Sparkles size={14} />
+          <span className="font-semibold">AI Analyze</span>
+        </button>
+      </div>
+    </header>
+  );
+
+  return (
+    <div className="flex flex-col md:flex-row h-screen bg-[#FDFBF7] font-sans overflow-hidden">
+      
+      {/* Mobile Header */}
+      <div className="md:hidden bg-[#F4F1EA] p-4 flex justify-between items-center border-b border-slate-200 z-20">
+        <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <div className="w-3 h-3 bg-teal-600 rounded-sm"></div> SEA ERP Market
+        </h1>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-white rounded shadow-sm">
+          <Menu size={20} />
+        </button>
+      </div>
+
+      {/* Sidebar Navigation */}
+      <nav className={`fixed md:relative w-full md:w-64 h-full bg-[#F4F1EA] border-r border-slate-200 flex flex-col z-10 transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="p-6 hidden md:block">
+          <h1 className="text-xl font-bold tracking-tight text-slate-800 leading-tight flex items-center gap-2">
+             <div className="w-4 h-4 bg-teal-600 rounded-sm"></div> SEA ERP
+          </h1>
+          <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider font-semibold">SME Focus 2026</p>
         </div>
-        <div class="flex md:flex-col overflow-x-auto md:overflow-visible px-4 md:px-0 pb-4 md:pb-0 gap-2 md:gap-0">
-            <button onclick="switchTab('overview')" id="nav-overview" class="nav-btn active flex-shrink-0 md:w-full text-left px-6 py-3 text-sm rounded-lg md:rounded-none hover:bg-gray-200 focus:outline-none">
-                &#128202; Market Overview
-            </button>
-            <button onclick="switchTab('traits')" id="nav-traits" class="nav-btn flex-shrink-0 md:w-full text-left px-6 py-3 text-sm rounded-lg md:rounded-none hover:bg-gray-200 focus:outline-none">
-                &#128101; Traits & Needs
-            </button>
-            <button onclick="switchTab('outsourcing')" id="nav-outsourcing" class="nav-btn flex-shrink-0 md:w-full text-left px-6 py-3 text-sm rounded-lg md:rounded-none hover:bg-gray-200 focus:outline-none">
-                &#129309; Outsourcing Behavior
-            </button>
-            <button onclick="switchTab('sources')" id="nav-sources" class="nav-btn flex-shrink-0 md:w-full text-left px-6 py-3 text-sm rounded-lg md:rounded-none hover:bg-gray-200 focus:outline-none">
-                &#128218; Research Sources
-            </button>
+        <div className="flex-1 overflow-y-auto py-4 md:py-0">
+          <TabButton id="overview" icon={BarChart2} label="Market Overview" />
+          <TabButton id="traits" icon={Users} label="Traits & Needs" />
+          <TabButton id="outsourcing" icon={Briefcase} label="Outsourcing" />
+          <TabButton id="sources" icon={BookOpen} label="Research Sources" />
         </div>
-        <div class="mt-auto hidden md:block p-6 text-xs text-gray-400">
-            Synthesized Report &copy; 2026<br>Data Analysis Engine
+        <div className="p-6 text-xs text-slate-400 border-t border-slate-200">
+          Synthesized Report &copy; 2026
         </div>
-    </nav>
+      </nav>
 
-    <main class="flex-1 overflow-y-auto p-4 md:p-8 relative bg-stoneBg">
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto p-4 md:p-10 relative">
         
-        <section id="sec-overview" class="view-section fade-in block">
-            <header class="mb-8">
-                <h2 class="text-3xl font-bold text-slateText mb-2">Market Overview & Adoption</h2>
-                <div class="h-1 w-20 bg-tealAccent rounded"></div>
-            </header>
-            
-            <p class="text-gray-600 mb-8 max-w-3xl leading-relaxed">
-                This section establishes the macroeconomic context of ERP adoption among Small and Medium Enterprises (SMEs) and Medium Corporations across Southeast Asia (SEA). The data illustrates a rapid migration toward agile, scalable systems, primarily driven by post-pandemic digital transformation mandates. Understanding these high-level shifts provides the foundation for analyzing specific user needs.
-            </p>
+        {/* Overview Section */}
+        <div className={activeTab === 'overview' ? 'block animate-in fade-in duration-500' : 'hidden'} ref={sectionRefs.overview}>
+          <SectionHeader title="Market Overview & Adoption" colorClass="bg-teal-600" onAnalyze={() => handleAnalyze('overview')} onListen={() => handleSpeakSection('overview')} />
+          
+          <p className="text-slate-600 mb-8 max-w-4xl leading-relaxed text-lg">
+            This section establishes the macroeconomic context of ERP adoption among Small and Medium Enterprises (SMEs) and Medium Corporations across Southeast Asia (SEA). The data illustrates a rapid migration toward agile, scalable systems, primarily driven by post-pandemic digital transformation mandates. Understanding these high-level shifts provides the foundation for analyzing specific user needs.
+          </p>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm flex flex-col justify-center items-center text-center">
-                    <span class="text-4xl font-bold text-tealAccent mb-1">12.4%</span>
-                    <span class="text-sm font-semibold text-gray-700">Projected CAGR (2024-2028)</span>
-                    <span class="text-xs text-gray-500 mt-2">Driven by SME digitalization grants across SG, MY, and ID.</span>
-                </div>
-                <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm flex flex-col justify-center items-center text-center">
-                    <span class="text-4xl font-bold text-terraAccent mb-1">$4.2B</span>
-                    <span class="text-sm font-semibold text-gray-700">Est. TAM for SME ERP in SEA</span>
-                    <span class="text-xs text-gray-500 mt-2">Total Addressable Market expected by late 2026.</span>
-                </div>
-                <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm flex flex-col justify-center items-center text-center">
-                    <span class="text-4xl font-bold text-slateText mb-1">68%</span>
-                    <span class="text-sm font-semibold text-gray-700">First-time Adopters</span>
-                    <span class="text-xs text-gray-500 mt-2">Upgrading from fragmented spreadsheets or legacy local accounting tools.</span>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            {[ 
+              { v: '12.4%', l: 'Projected CAGR', sub: 'Driven by SME digitalization grants across SG, MY, and ID.', c: 'text-teal-600' }, 
+              { v: '$4.2B', l: 'Est. TAM for SME ERP', sub: 'Total Addressable Market expected by late 2026.', c: 'text-orange-600' }, 
+              { v: '68%', l: 'First-time Adopters', sub: 'Upgrading from fragmented spreadsheets or legacy local accounting tools.', c: 'text-slate-800' } 
+            ].map((stat, i) => (
+              <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center text-center">
+                <span className={`text-4xl font-bold mb-2 ${stat.c}`}>{stat.v}</span>
+                <span className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-2">{stat.l}</span>
+                <span className="text-xs text-slate-500">{stat.sub}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-bold mb-2 text-slate-800">Deployment Preferences (2026 Current State)</h3>
+            <p className="text-sm text-slate-500 mb-6">Insight: Cloud adoption dominates as SMEs prefer OPEX over CAPEX models to preserve cash flow.</p>
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={overviewData} innerRadius={80} outerRadius={120} paddingAngle={5} dataKey="value">
+                    {overviewData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip />
+                  <Legend verticalAlign="bottom" height={36}/>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Traits Section */}
+        <div className={activeTab === 'traits' ? 'block animate-in fade-in duration-500' : 'hidden'} ref={sectionRefs.traits}>
+          <SectionHeader title="Firm Traits & Core Needs" colorClass="bg-orange-600" onAnalyze={() => handleAnalyze('traits')} onListen={() => handleSpeakSection('traits')} />
+          
+          <p className="text-slate-600 mb-8 max-w-4xl leading-relaxed text-lg">
+            This section dissects the specific characteristics and operational bottlenecks of SEA SMEs and Medium Corporations. By analyzing their feature priorities and pain points, we can understand why monolithic, traditional ERPs fail in this segment, and why agile, modular, and localized solutions are capturing market share.
+          </p>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+              <h3 className="text-lg font-bold mb-2 text-slate-800">Decision-Making Priorities</h3>
+              <p className="text-sm text-slate-500 mb-6">Organizations index heavily on cost, speed of implementation, and local compliance over heavy customization.</p>
+              <div className="flex-1 min-h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={traitsData}>
+                    <PolarGrid stroke="#E2E8F0" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 12 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                    <Radar name="Priority" dataKey="A" stroke={COLORS.teal} fill={COLORS.teal} fillOpacity={0.4} />
+                    <Tooltip />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
-            <div class="w-full">
-                <h3 class="text-lg font-semibold mb-4">Deployment Preferences (2026 Current State)</h3>
-                <div class="chart-container">
-                    <canvas id="deploymentChart"></canvas>
+            <div className="flex flex-col gap-4">
+              {[ { t: "Trait 1: Lean Internal IT", d: "Most SMEs lack dedicated IT departments. They require intuitive UIs that do not require extensive technical training. 'Consumer-grade UX' is a major buying criteria.", c: "border-teal-600" },
+                 { t: "Trait 2: Mobile-First Workforce", d: "Particularly in ID, VN, and PH, field sales and logistics personnel rely entirely on mobile devices. ERPs must have robust, offline-capable mobile companion apps.", c: "border-orange-600" },
+                 { t: "Trait 3: Multi-Entity, Multi-Currency", d: "Even relatively small SEA firms often operate across borders (e.g., SG HQ, MY manufacturing, VN tech hub), requiring localized tax engines and multi-currency consolidation out-of-the-box.", c: "border-slate-800" }
+              ].map((trait, i) => (
+                <div key={i} className={`bg-white p-6 rounded-2xl border-l-4 ${trait.c} shadow-sm`}>
+                  <h4 className="font-bold text-slate-800 text-lg">{trait.t}</h4>
+                  <p className="text-sm text-slate-600 mt-2 leading-relaxed">{trait.d}</p>
                 </div>
-                <p class="text-sm text-gray-500 mt-4 text-center">
-                    Insight: Cloud adoption dominates as SMEs prefer OPEX over CAPEX models to preserve cash flow.
-                </p>
+              ))}
             </div>
-        </section>
+          </div>
 
-        <section id="sec-traits" class="view-section fade-in hidden">
-            <header class="mb-8">
-                <h2 class="text-3xl font-bold text-slateText mb-2">Firm Traits & Core Needs</h2>
-                <div class="h-1 w-20 bg-terraAccent rounded"></div>
-            </header>
-
-            <p class="text-gray-600 mb-8 max-w-3xl leading-relaxed">
-                This section dissects the specific characteristics and operational bottlenecks of SEA SMEs and Medium Corporations. By analyzing their feature priorities and pain points, we can understand why monolithic, traditional ERPs fail in this segment, and why agile, modular, and localized solutions are capturing market share.
-            </p>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm">
-                    <h3 class="text-lg font-semibold mb-4 text-slateText">Decision-Making Priorities</h3>
-                    <p class="text-sm text-gray-600 mb-4">Organizations index heavily on cost, speed of implementation, and local compliance over heavy customization.</p>
-                    <div class="chart-container" style="height: 320px;">
-                        <canvas id="traitsRadarChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="flex flex-col gap-4">
-                    <div class="bg-lightCard p-5 rounded-lg border-l-4 border-tealAccent">
-                        <h4 class="font-bold text-gray-800">Trait 1: Lean Internal IT</h4>
-                        <p class="text-sm text-gray-600 mt-1">Most SMEs lack dedicated IT departments. They require intuitive UIs that do not require extensive technical training. "Consumer-grade UX" is a major buying criteria.</p>
-                    </div>
-                    <div class="bg-lightCard p-5 rounded-lg border-l-4 border-terraAccent">
-                        <h4 class="font-bold text-gray-800">Trait 2: Mobile-First Workforce</h4>
-                        <p class="text-sm text-gray-600 mt-1">Particularly in ID, VN, and PH, field sales and logistics personnel rely entirely on mobile devices. ERPs must have robust, offline-capable mobile companion apps.</p>
-                    </div>
-                    <div class="bg-lightCard p-5 rounded-lg border-l-4 border-slateText">
-                        <h4 class="font-bold text-gray-800">Trait 3: Multi-Entity, Multi-Currency</h4>
-                        <p class="text-sm text-gray-600 mt-1">Even relatively small SEA firms often operate across borders (e.g., SG HQ, MY manufacturing, VN tech hub), requiring localized tax engines and multi-currency consolidation out-of-the-box.</p>
-                    </div>
-                </div>
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 className="text-lg font-bold mb-2 text-slate-800">Most Demanded Modules by Segment</h3>
+            <p className="text-sm text-slate-500 mb-6">While enterprise firms buy full suites, SMEs purchase modularly, focusing on immediate pain points (cash flow and inventory).</p>
+            <div className="h-72 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={needsData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                  <XAxis type="number" domain={[0, 100]} stroke="#94A3B8" />
+                  <YAxis dataKey="name" type="category" width={80} stroke="#475569" tick={{ fontSize: 13 }} />
+                  <Tooltip cursor={{fill: '#F8FAFC'}} />
+                  <Bar dataKey="demand" fill={COLORS.terra} radius={[0, 4, 4, 0]} barSize={24} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
+          </div>
+        </div>
 
-            <div class="w-full bg-white p-6 rounded-xl border border-borderSubtle shadow-sm mt-8">
-                <h3 class="text-lg font-semibold mb-4">Most Demanded Modules by Segment</h3>
-                <p class="text-sm text-gray-600 mb-4">While enterprise firms buy full suites, SMEs purchase modularly, focusing on immediate pain points (cash flow and inventory).</p>
-                <div class="chart-container">
-                    <canvas id="needsBarChart"></canvas>
-                </div>
-            </div>
-        </section>
+        {/* Outsourcing Section */}
+        <div className={activeTab === 'outsourcing' ? 'block animate-in fade-in duration-500' : 'hidden'} ref={sectionRefs.outsourcing}>
+          <SectionHeader title="Outsourcing Behavior" colorClass="bg-teal-600" onAnalyze={() => handleAnalyze('outsourcing')} onListen={() => handleSpeakSection('outsourcing')} />
+          
+          <p className="text-slate-600 mb-8 max-w-4xl leading-relaxed text-lg">
+            This section explores how target companies procure, implement, and maintain their ERP systems. Due to the "Lean Internal IT" trait identified earlier, there is a pronounced reliance on third-party vendors. Understanding this behavior is critical for software providers tailoring their go-to-market and partnership strategies in SEA.
+          </p>
 
-        <section id="sec-outsourcing" class="view-section fade-in hidden">
-            <header class="mb-8">
-                <h2 class="text-3xl font-bold text-slateText mb-2">Outsourcing Behavior</h2>
-                <div class="h-1 w-20 bg-tealAccent rounded"></div>
-            </header>
-
-            <p class="text-gray-600 mb-8 max-w-3xl leading-relaxed">
-                This section explores how target companies procure, implement, and maintain their ERP systems. Due to the "Lean Internal IT" trait identified earlier, there is a pronounced reliance on third-party vendors. Understanding this behavior is critical for software providers tailoring their go-to-market and partnership strategies in SEA.
-            </p>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                <div class="w-full">
-                    <h3 class="text-lg font-semibold mb-4">Implementation & Maintenance Models</h3>
-                    <div class="chart-container">
-                        <canvas id="outsourcingPieChart"></canvas>
-                    </div>
-                </div>
-                
-                <div class="space-y-6">
-                    <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm transition hover:shadow-md cursor-pointer group" onclick="toggleDetails('det-msp')">
-                        <div class="flex justify-between items-center">
-                            <h4 class="font-bold text-lg text-slateText group-hover:text-tealAccent transition">Reliance on MSPs (Managed Service Providers)</h4>
-                            <span class="text-tealAccent text-xl">&#43;</span>
-                        </div>
-                        <p id="det-msp" class="text-sm text-gray-600 mt-3 hidden">
-                            <strong>Behavior:</strong> 62% of SMEs opt for full Managed Services. They do not want to manage server instances, updates, or deep system troubleshooting. They prefer to pay a unified monthly subscription that includes software licensing, hosting, and tier-1 support from a local partner who speaks the local language.
-                        </p>
-                    </div>
-
-                    <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm transition hover:shadow-md cursor-pointer group" onclick="toggleDetails('det-localize')">
-                        <div class="flex justify-between items-center">
-                            <h4 class="font-bold text-lg text-slateText group-hover:text-terraAccent transition">The "Local Partner" Premium</h4>
-                            <span class="text-terraAccent text-xl">&#43;</span>
-                        </div>
-                        <p id="det-localize" class="text-sm text-gray-600 mt-3 hidden">
-                            <strong>Behavior:</strong> Global software vendors (like SAP, Oracle NetSuite, Microsoft) rely heavily on Tier-1 localized System Integrators (SIs). SMEs strongly prefer dealing with a local SI because they understand highly specific regional compliance (e.g., e-Faktur in Indonesia, SST in Malaysia, e-Invoicing rollout in Singapore/Vietnam).
-                        </p>
-                    </div>
-
-                    <div class="bg-white p-6 rounded-xl border border-borderSubtle shadow-sm transition hover:shadow-md cursor-pointer group" onclick="toggleDetails('det-custom')">
-                        <div class="flex justify-between items-center">
-                            <h4 class="font-bold text-lg text-slateText group-hover:text-slateText transition">Resistance to Customization</h4>
-                            <span class="text-slateText text-xl">&#43;</span>
-                        </div>
-                        <p id="det-custom" class="text-sm text-gray-600 mt-3 hidden">
-                            <strong>Behavior:</strong> Historically, custom-built ERPs failed due to high maintenance costs. Currently, SEA SMEs are exhibiting "Best Practice Adoption" behavior—altering their internal workflows to match the ERP's default state, rather than paying exorbitant fees to customize the software to legacy, inefficient processes.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="sec-sources" class="view-section fade-in hidden">
-            <header class="mb-8">
-                <h2 class="text-3xl font-bold text-slateText mb-2">Research Synthesis & Sources</h2>
-                <div class="h-1 w-20 bg-gray-400 rounded"></div>
-            </header>
-
-            <p class="text-gray-600 mb-8 max-w-3xl leading-relaxed">
-                The data and insights presented in this interactive application are synthesized from leading market research firms, economic landscape reports, and regional technology surveys. Below is the summarized bibliography detailing the foundations of our analysis regarding the SEA SME ERP market.
-            </p>
-
-            <div class="bg-white rounded-xl border border-borderSubtle overflow-hidden">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left text-gray-500">
-                        <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b border-borderSubtle">
-                            <tr>
-                                <th scope="col" class="px-6 py-4">Source Title & Organization</th>
-                                <th scope="col" class="px-6 py-4">Key Insight Synthesized</th>
-                                <th scope="col" class="px-6 py-4">Reference URL</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="bg-white border-b">
-                                <th scope="row" class="px-6 py-4 font-medium text-gray-900">
-                                    Worldwide ICT Spending Guide: Enterprise Applications (SEA Focus)<br>
-                                    <span class="text-xs font-normal text-gray-500">International Data Corporation (IDC)</span>
-                                </th>
-                                <td class="px-6 py-4">
-                                    Provided quantitative data on TAM, CAGR (12.4%), and the massive transition from on-premise to SaaS/Cloud models among businesses under 500 employees.
-                                </td>
-                                <td class="px-6 py-4">
-                                    <a href="https://www.idc.com/getdoc.jsp?containerId=IDC_P33195" target="_blank" class="text-tealAccent hover:underline break-all">https://www.idc.com/getdoc.jsp?containerId=IDC_P33195</a>
-                                </td>
-                            </tr>
-                            <tr class="bg-gray-50 border-b">
-                                <th scope="row" class="px-6 py-4 font-medium text-gray-900">
-                                    Digital Transformation of SMEs in ASEAN<br>
-                                    <span class="text-xs font-normal text-gray-500">Bain & Company / World Economic Forum</span>
-                                </th>
-                                <td class="px-6 py-4">
-                                    Sourced behavioral insights indicating the critical need for mobile-first accessibility and the lack of internal IT capabilities, driving reliance on outsourced MSPs.
-                                </td>
-                                <td class="px-6 py-4">
-                                    <a href="https://www.weforum.org/reports/asean-sme-digital-transformation" target="_blank" class="text-tealAccent hover:underline break-all">https://www.weforum.org/reports/asean-sme-digital-transformation</a>
-                                </td>
-                            </tr>
-                            <tr class="bg-white border-b">
-                                <th scope="row" class="px-6 py-4 font-medium text-gray-900">
-                                    Magic Quadrant for Cloud ERP for Product-Centric Enterprises<br>
-                                    <span class="text-xs font-normal text-gray-500">Gartner</span>
-                                </th>
-                                <td class="px-6 py-4">
-                                    Identified module prioritization (Finance and Inventory/WMS as primary drivers) and the behavioral shift away from heavy customization towards standardized, localized deployments.
-                                </td>
-                                <td class="px-6 py-4">
-                                    <a href="https://www.gartner.com/en/documents/4004523" target="_blank" class="text-tealAccent hover:underline break-all">https://www.gartner.com/en/documents/4004523</a>
-                                </td>
-                            </tr>
-                            <tr class="bg-gray-50">
-                                <th scope="row" class="px-6 py-4 font-medium text-gray-900">
-                                    Southeast Asia Tech Landscape 2025: B2B SaaS Trends<br>
-                                    <span class="text-xs font-normal text-gray-500">Tech in Asia Reports</span>
-                                </th>
-                                <td class="px-6 py-4">
-                                    Highlighted the "Local Partner Premium," emphasizing the necessity of local SIs for navigating complex regional tax laws and e-invoicing mandates.
-                                </td>
-                                <td class="px-6 py-4">
-                                    <a href="https://www.techinasia.com/reports/sea-b2b-saas-landscape" target="_blank" class="text-tealAccent hover:underline break-all">https://www.techinasia.com/reports/sea-b2b-saas-landscape</a>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+              <h3 className="text-lg font-bold mb-6 text-slate-800">Implementation & Maintenance Models</h3>
+              <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={outsourcingData} innerRadius={0} outerRadius={120} dataKey="value">
+                      {outsourcingData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom"/>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
             
-            <div class="mt-8 p-6 bg-tealAccent bg-opacity-10 rounded-xl border border-tealAccent">
-                <h4 class="font-bold text-slateText mb-2">&#128269; Synthesis Summary</h4>
-                <p class="text-sm text-gray-700">
-                    The research collectively points to a maturation of the SEA SME market. Moving away from highly fragmented spreadsheets and localized software, these businesses are actively seeking unified Cloud ERPs. However, their buying behavior is heavily constrained by limited technical resources and strict budgets. Therefore, success in this market is less about offering the most robust feature set, and more about offering rapid deployment, regional compliance out-of-the-box, and strong local implementation partners acting as outsourced IT hubs.
-                </p>
+            <div className="space-y-6">
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                <h4 className="font-bold text-slate-800 text-lg flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-slate-100 rounded-lg"><Users size={20} className="text-slate-600"/></div>
+                  Reliance on MSPs
+                </h4>
+                <p className="text-slate-600 leading-relaxed">62% of SMEs opt for full Managed Services. They do not want to manage server instances, updates, or deep system troubleshooting. They prefer to pay a unified monthly subscription that includes software licensing, hosting, and tier-1 support from a local partner who speaks the local language.</p>
+              </div>
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                <h4 className="font-bold text-slate-800 text-lg flex items-center gap-3 mb-2">
+                   <div className="p-2 bg-teal-50 rounded-lg"><Briefcase size={20} className="text-teal-600"/></div>
+                  The "Local Partner" Premium
+                </h4>
+                <p className="text-slate-600 leading-relaxed">Global software vendors rely heavily on Tier-1 localized System Integrators (SIs). SMEs strongly prefer dealing with a local SI because they understand highly specific regional compliance (e.g., e-Faktur in Indonesia, SST in Malaysia, e-Invoicing rollout in Singapore/Vietnam).</p>
+              </div>
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+                <h4 className="font-bold text-slate-800 text-lg flex items-center gap-3 mb-2">
+                   <div className="p-2 bg-orange-50 rounded-lg"><BookOpen size={20} className="text-orange-600"/></div>
+                  Resistance to Customization
+                </h4>
+                <p className="text-slate-600 leading-relaxed">Historically, custom-built ERPs failed due to high maintenance costs. Currently, SEA SMEs are exhibiting "Best Practice Adoption" behavior—altering their internal workflows to match the ERP's default state, rather than paying exorbitant fees to customize the software to legacy, inefficient processes.</p>
+              </div>
             </div>
-        </section>
+          </div>
+        </div>
 
-    </main>
+        {/* Sources Section */}
+        <div className={activeTab === 'sources' ? 'block animate-in fade-in duration-500' : 'hidden'} ref={sectionRefs.sources}>
+          <header className="mb-8">
+             <h2 className="text-3xl font-bold text-slate-800 mb-2">Research Synthesis & Sources</h2>
+             <div className="h-1 w-20 bg-slate-400 rounded"></div>
+          </header>
 
-    <script>
-        let charts = {};
+          <p className="text-slate-600 mb-8 max-w-4xl leading-relaxed text-lg">
+            The data and insights presented in this interactive application are synthesized from leading market research firms, economic landscape reports, and regional technology surveys.
+          </p>
 
-        const chartColors = {
-            teal: '#319795',
-            tealLight: 'rgba(49, 151, 149, 0.2)',
-            terra: '#DD6B20',
-            terraLight: 'rgba(221, 107, 32, 0.2)',
-            slate: '#2D3748',
-            slateLight: 'rgba(45, 55, 72, 0.2)',
-            gray: '#A0AEC0'
-        };
-
-        const globalChartOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { font: { family: 'Inter', size: 12 }, color: '#4A5568' }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(45, 55, 72, 0.9)',
-                    titleFont: { family: 'Inter', size: 13 },
-                    bodyFont: { family: 'Inter', size: 13 },
-                    padding: 10,
-                    cornerRadius: 4,
-                    displayColors: true
-                }
-            }
-        };
-
-        function initOverviewChart() {
-            if(charts.deployment) charts.deployment.destroy();
-            const ctx = document.getElementById('deploymentChart').getContext('2d');
-            charts.deployment = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Public Cloud (SaaS)', 'Hybrid Cloud', 'On-Premise Legacy'],
-                    datasets: [{
-                        data: [76, 15, 9],
-                        backgroundColor: [chartColors.teal, chartColors.terra, chartColors.slate],
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    ...globalChartOptions,
-                    cutout: '65%',
-                    plugins: {
-                        ...globalChartOptions.plugins,
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) { return context.label + ': ' + context.parsed + '%'; }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function initTraitsChart() {
-            if(charts.traits) charts.traits.destroy();
-            const ctx = document.getElementById('traitsRadarChart').getContext('2d');
-            charts.traits = new Chart(ctx, {
-                type: 'radar',
-                data: {
-                    labels: [
-                        ['Cost', 'Efficiency'], 
-                        ['Ease of', 'Use / UX'], 
-                        ['Local', 'Compliance'], 
-                        ['Vendor', 'Support'], 
-                        ['Deep', 'Customization']
-                    ],
-                    datasets: [{
-                        label: 'SME Priority Score (0-100)',
-                        data: [92, 88, 95, 80, 35],
-                        backgroundColor: chartColors.tealLight,
-                        borderColor: chartColors.teal,
-                        pointBackgroundColor: chartColors.teal,
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    ...globalChartOptions,
-                    scales: {
-                        r: {
-                            angleLines: { color: 'rgba(0,0,0,0.1)' },
-                            grid: { color: 'rgba(0,0,0,0.1)' },
-                            pointLabels: { font: { family: 'Inter', size: 11 }, color: '#4A5568' },
-                            ticks: { display: false, min: 0, max: 100 }
-                        }
-                    }
-                }
-            });
-        }
-
-        function initNeedsChart() {
-            if(charts.needs) charts.needs.destroy();
-            const ctx = document.getElementById('needsBarChart').getContext('2d');
-            charts.needs = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Finance & Accounting', 'Inventory & WMS', 'Sales / CRM', 'HR & Payroll', 'Manufacturing (MRP)', 'E-commerce Sync'],
-                    datasets: [{
-                        label: '% of SMEs Requesting in Phase 1',
-                        data: [95, 82, 68, 60, 45, 55],
-                        backgroundColor: chartColors.terra,
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    ...globalChartOptions,
-                    indexAxis: 'y',
-                    scales: {
-                        x: {
-                            grid: { color: 'rgba(0,0,0,0.05)' },
-                            ticks: { color: '#4A5568', font: {family: 'Inter'} },
-                            max: 100
-                        },
-                        y: {
-                            grid: { display: false },
-                            ticks: { color: '#4A5568', font: {family: 'Inter'} }
-                        }
-                    }
-                }
-            });
-        }
-
-        function initOutsourcingChart() {
-            if(charts.outsourcing) charts.outsourcing.destroy();
-            const ctx = document.getElementById('outsourcingPieChart').getContext('2d');
-            charts.outsourcing = new Chart(ctx, {
-                type: 'pie',
-                data: {
-                    labels: ['Fully Managed by Local Partner', 'Co-Managed (Hybrid IT)', 'Fully In-House IT'],
-                    datasets: [{
-                        data: [62, 28, 10],
-                        backgroundColor: [chartColors.slate, chartColors.teal, chartColors.gray],
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    ...globalChartOptions,
-                    plugins: {
-                        ...globalChartOptions.plugins,
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) { return context.label + ': ' + context.parsed + '%'; }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.view-section').forEach(sec => {
-                sec.classList.add('hidden');
-                sec.classList.remove('block');
-            });
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active');
-                btn.classList.add('text-slateText');
-            });
-
-            const targetSec = document.getElementById(`sec-${tabId}`);
-            targetSec.classList.remove('hidden');
-            targetSec.classList.add('block');
+          <div className="mb-8 p-8 bg-white rounded-2xl border-2 border-teal-100 shadow-[0_0_20px_rgba(49,151,149,0.1)]">
+            <h3 className="font-bold text-teal-600 mb-2 flex items-center gap-2 text-xl">
+              <Sparkles size={20} /> Gemini Live Market Intel
+            </h3>
+            <p className="text-sm text-slate-600 mb-6">Access real-time 2026 ERP news, regulatory changes, or competitor movements via Google Search grounding.</p>
+            <div className="flex flex-col md:flex-row gap-3">
+              <input 
+                type="text" 
+                value={intelQuery}
+                onChange={(e) => setIntelQuery(e.target.value)}
+                placeholder="e.g. 2026 Malaysia e-invoicing updates..." 
+                className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 transition"
+              />
+              <button 
+                onClick={handleLiveIntel} 
+                disabled={isIntelLoading}
+                className="bg-teal-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-teal-700 transition flex items-center justify-center gap-2 disabled:opacity-70"
+              >
+                {isIntelLoading ? <Loader2 size={18} className="animate-spin" /> : <Search size={18} />}
+                Search
+              </button>
+            </div>
             
-            const targetBtn = document.getElementById(`nav-${tabId}`);
-            targetBtn.classList.add('active');
-            targetBtn.classList.remove('text-slateText');
+            {intelResult && (
+              <div className="mt-6 p-6 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 leading-relaxed whitespace-pre-wrap text-sm">
+                {intelResult}
+              </div>
+            )}
+          </div>
 
-            if(tabId === 'overview') initOverviewChart();
-            if(tabId === 'traits') {
-                setTimeout(() => {
-                    initTraitsChart();
-                    initNeedsChart();
-                }, 50);
-            }
-            if(tabId === 'outsourcing') {
-                setTimeout(() => initOutsourcingChart(), 50);
-            }
-        }
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-4 text-xs uppercase font-bold text-slate-500 tracking-wider">Source</th>
+                  <th className="px-6 py-4 text-xs uppercase font-bold text-slate-500 tracking-wider">Insight</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <tr><td className="px-6 py-5 font-semibold text-slate-800">IDC ICT Guide</td><td className="px-6 py-5 text-slate-600">12.4% CAGR Data & Cloud Transition Metrics</td></tr>
+                <tr><td className="px-6 py-5 font-semibold text-slate-800">Bain & Company / WEF</td><td className="px-6 py-5 text-slate-600">Sourced behavioral insights indicating the critical need for mobile-first accessibility.</td></tr>
+                <tr><td className="px-6 py-5 font-semibold text-slate-800">Gartner Magic Quadrant</td><td className="px-6 py-5 text-slate-600">SaaS Transformation Trends & Module Priorities</td></tr>
+                <tr><td className="px-6 py-5 font-semibold text-slate-800">Tech in Asia Reports</td><td className="px-6 py-5 text-slate-600">Local Partner Premium and Implementation Challenges</td></tr>
+              </tbody>
+            </table>
+          </div>
 
-        function toggleDetails(id) {
-            const el = document.getElementById(id);
-            const icon = el.previousElementSibling.querySelector('span');
-            if(el.classList.contains('hidden')) {
-                el.classList.remove('hidden');
-                icon.innerHTML = '&#8722;'; // minus sign
-            } else {
-                el.classList.add('hidden');
-                icon.innerHTML = '&#43;'; // plus sign
-            }
-        }
+          <div className="mt-8 p-8 bg-slate-800 rounded-2xl shadow-sm text-white">
+            <h4 className="font-bold text-xl mb-3 flex items-center gap-2 text-teal-400">
+              <Sparkles size={20} /> Synthesis Summary
+            </h4>
+            <p className="text-slate-300 leading-relaxed">
+              The research collectively points to a maturation of the SEA SME market. Moving away from highly fragmented spreadsheets and localized software, these businesses are actively seeking unified Cloud ERPs. However, their buying behavior is heavily constrained by limited technical resources and strict budgets. Therefore, success in this market is less about offering the most robust feature set, and more about offering rapid deployment, regional compliance out-of-the-box, and strong local implementation partners acting as outsourced IT hubs.
+            </p>
+          </div>
+        </div>
 
-        window.onload = () => {
-            initOverviewChart();
-        };
+      </main>
 
-    </script>
-</body>
-</html>
+      {/* FAB */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <button 
+          onClick={() => handleAnalyze(activeTab)} 
+          className="bg-teal-600 text-white p-4 rounded-full shadow-xl hover:scale-105 hover:bg-teal-700 transition-all flex items-center justify-center"
+        >
+          <Sparkles size={24} />
+        </button>
+      </div>
+
+      {/* AI Modal */}
+      {aiModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl">
+              <h3 className="text-xl font-bold text-teal-700 flex items-center gap-2">
+                <Sparkles size={20} /> AI Strategy Advisor
+              </h3>
+              <button onClick={() => { setAiModalOpen(false); stopAudio(); }} className="text-slate-400 hover:text-slate-800 p-2 rounded-full hover:bg-slate-200 transition">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto flex-1">
+              {isAILoading ? (
+                <div className="flex flex-col items-center justify-center h-48 text-slate-500">
+                  <Loader2 size={32} className="animate-spin mb-4 text-teal-600" />
+                  <p className="text-sm font-medium">Synthesizing market intelligence...</p>
+                </div>
+              ) : (
+                <div className="text-slate-700 leading-relaxed whitespace-pre-wrap text-lg">
+                  {aiContent}
+                </div>
+              )}
+            </div>
+
+            {!isAILoading && (
+              <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-3xl">
+                <button onClick={handleReplayAI} className="px-5 py-2.5 rounded-xl border-2 border-teal-600 text-teal-700 font-bold hover:bg-teal-50 transition flex items-center gap-2">
+                  <Volume2 size={16} /> Play Audio
+                </button>
+                <button onClick={() => { setAiModalOpen(false); stopAudio(); }} className="px-6 py-2.5 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition">
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
